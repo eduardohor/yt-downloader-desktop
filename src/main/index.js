@@ -89,12 +89,30 @@ ipcMain.handle('analyze-url', async (_event, url) => {
       }
       try {
         const info = JSON.parse(output)
+
+        const formats = info.formats || []
+
+        const videoHeights = [
+          ...new Set(
+            formats
+              .filter((f) => f.height && f.height > 0)
+              .map((f) => f.height)
+          )
+        ].sort((a, b) => b - a)
+
+        const audioBitrates = formats
+          .filter((f) => f.abr && f.abr > 0)
+          .map((f) => Math.round(f.abr))
+        const maxAudioBitrate = audioBitrates.length > 0 ? Math.max(...audioBitrates) : 128
+
         resolve({
           title: info.title,
           thumbnail: info.thumbnail,
           duration: info.duration,
           uploader: info.uploader,
-          isPlaylist: false
+          isPlaylist: false,
+          videoHeights,
+          maxAudioBitrate
         })
       } catch {
         reject(new Error('Erro ao processar informações do vídeo'))
@@ -144,11 +162,17 @@ ipcMain.handle('start-download', async (_event, { url, format, outputDir, downlo
     if (format === 'mp4-best') {
       args.push('-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best')
       args.push('--merge-output-format', 'mp4')
+    } else if (format === 'mp4-1080') {
+      args.push('-f', 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]')
+      args.push('--merge-output-format', 'mp4')
     } else if (format === 'mp4-720') {
       args.push('-f', 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]')
       args.push('--merge-output-format', 'mp4')
     } else if (format === 'mp4-480') {
       args.push('-f', 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480]')
+      args.push('--merge-output-format', 'mp4')
+    } else if (format === 'mp4-360') {
+      args.push('-f', 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360]')
       args.push('--merge-output-format', 'mp4')
     } else if (format === 'mp3-high') {
       args.push('-x', '--audio-format', 'mp3', '--audio-quality', '0')

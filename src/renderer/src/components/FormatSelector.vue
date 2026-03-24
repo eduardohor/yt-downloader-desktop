@@ -1,35 +1,104 @@
 <script setup>
+import { computed } from 'vue'
+
 const props = defineProps({
   modelValue: String,
-  disabled: Boolean
+  disabled: Boolean,
+  videoHeights: Array,
+  maxAudioBitrate: Number
 })
 
 const emit = defineEmits(['update:modelValue'])
 
-const formatos = [
-  { value: 'mp4-best', label: 'MP4 — Melhor qualidade', icon: '🎬' },
-  { value: 'mp4-720', label: 'MP4 — 720p', icon: '📹' },
-  { value: 'mp4-480', label: 'MP4 — 480p', icon: '📹' },
-  { value: 'mp3-high', label: 'MP3 — Alta qualidade', icon: '🎵' },
-  { value: 'mp3-medium', label: 'MP3 — Média qualidade', icon: '🎵' }
-]
+const formatosVideo = computed(() => {
+  const alturas = props.videoHeights || []
+
+  const opcoes = []
+
+  if (alturas.length > 0) {
+    const melhor = alturas[0]
+    opcoes.push({
+      value: 'mp4-best',
+      label: `MP4 — ${melhor}p (melhor disponível)`,
+      sub: melhor >= 2160 ? '4K' : melhor >= 1440 ? '2K' : melhor >= 1080 ? 'Full HD' : melhor >= 720 ? 'HD' : 'SD',
+      icon: '🎬'
+    })
+  }
+
+  const resolucoes = [1080, 720, 480, 360]
+  for (const res of resolucoes) {
+    const disponivel = alturas.some((h) => h <= res)
+    if (!disponivel) continue
+    const real = alturas.find((h) => h <= res) || res
+    if (real === alturas[0]) continue // já está como "melhor disponível"
+    opcoes.push({
+      value: `mp4-${res}`,
+      label: `MP4 — ${res}p`,
+      sub: res >= 1080 ? 'Full HD' : res >= 720 ? 'HD' : res >= 480 ? 'SD' : 'baixa resolução',
+      icon: '📹'
+    })
+  }
+
+  return opcoes
+})
+
+const formatosAudio = computed(() => {
+  const maxBitrate = props.maxAudioBitrate || 128
+
+  const opcoes = []
+
+  if (maxBitrate >= 192) {
+    opcoes.push({ value: 'mp3-high', label: 'MP3 — Alta qualidade', sub: `até ${Math.min(maxBitrate, 320)} kbps`, icon: '🎵' })
+  } else {
+    opcoes.push({ value: 'mp3-high', label: 'MP3 — Alta qualidade', sub: `${maxBitrate} kbps (máximo disponível)`, icon: '🎵' })
+  }
+
+  opcoes.push({ value: 'mp3-medium', label: 'MP3 — Qualidade padrão', sub: '128 kbps · arquivo menor', icon: '🎵' })
+
+  return opcoes
+})
 </script>
 
 <template>
   <div class="format-selector">
-    <label class="label">Formato</label>
-    <div class="opcoes">
-      <button
-        v-for="f in formatos"
-        :key="f.value"
-        class="opcao"
-        :class="{ ativo: props.modelValue === f.value }"
-        :disabled="props.disabled"
-        @click="emit('update:modelValue', f.value)"
-      >
-        <span class="icon">{{ f.icon }}</span>
-        <span class="text">{{ f.label }}</span>
-      </button>
+    <div class="grupo">
+      <label class="label">Vídeo</label>
+      <div class="opcoes">
+        <button
+          v-for="f in formatosVideo"
+          :key="f.value"
+          class="opcao"
+          :class="{ ativo: props.modelValue === f.value }"
+          :disabled="props.disabled"
+          @click="emit('update:modelValue', f.value)"
+        >
+          <span class="icon">{{ f.icon }}</span>
+          <span class="texts">
+            <span class="text">{{ f.label }}</span>
+            <span class="sub">{{ f.sub }}</span>
+          </span>
+        </button>
+      </div>
+    </div>
+
+    <div class="grupo">
+      <label class="label">Somente áudio</label>
+      <div class="opcoes">
+        <button
+          v-for="f in formatosAudio"
+          :key="f.value"
+          class="opcao"
+          :class="{ ativo: props.modelValue === f.value }"
+          :disabled="props.disabled"
+          @click="emit('update:modelValue', f.value)"
+        >
+          <span class="icon">{{ f.icon }}</span>
+          <span class="texts">
+            <span class="text">{{ f.label }}</span>
+            <span class="sub">{{ f.sub }}</span>
+          </span>
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -37,6 +106,15 @@ const formatos = [
 <style scoped>
 .format-selector {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .label {
@@ -46,13 +124,12 @@ const formatos = [
   color: #888;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-bottom: 8px;
 }
 
 .opcoes {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .opcao {
@@ -62,11 +139,10 @@ const formatos = [
   background: #1e1e24;
   border: 1px solid #333;
   border-radius: 8px;
-  padding: 10px 14px;
+  padding: 9px 14px;
   cursor: pointer;
   text-align: left;
   color: #aaa;
-  font-size: 14px;
   transition: all 0.15s;
 }
 
@@ -75,10 +151,18 @@ const formatos = [
   color: #eee;
 }
 
+.opcao:hover:not(:disabled) .sub {
+  color: #777;
+}
+
 .opcao.ativo {
   border-color: #ff4444;
   color: #fff;
   background: #2a1a1a;
+}
+
+.opcao.ativo .sub {
+  color: #cc8888;
 }
 
 .opcao:disabled {
@@ -87,6 +171,24 @@ const formatos = [
 }
 
 .icon {
-  font-size: 16px;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.texts {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.text {
+  font-size: 13px;
+  font-weight: 500;
+  color: inherit;
+}
+
+.sub {
+  font-size: 11px;
+  color: #555;
 }
 </style>

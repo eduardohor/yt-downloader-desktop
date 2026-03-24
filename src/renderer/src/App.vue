@@ -92,6 +92,8 @@ function onNovoDownload() {
           <FormatSelector
             v-model="formato"
             :disabled="status === 'downloading'"
+            :videoHeights="videoInfo.videoHeights"
+            :maxAudioBitrate="videoInfo.maxAudioBitrate"
           />
 
           <ProgressBar
