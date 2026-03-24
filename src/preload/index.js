@@ -1,20 +1,17 @@
-import { contextBridge } from 'electron'
-import { electronAPI } from '@electron-toolkit/preload'
+import { contextBridge, ipcRenderer } from 'electron'
 
-// Custom APIs for renderer
-const api = {}
-
-// Use `contextBridge` APIs to expose Electron APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
-if (process.contextIsolated) {
-  try {
-    contextBridge.exposeInMainWorld('electron', electronAPI)
-    contextBridge.exposeInMainWorld('api', api)
-  } catch (error) {
-    console.error(error)
+contextBridge.exposeInMainWorld('api', {
+  analyzeUrl: (url) => ipcRenderer.invoke('analyze-url', url),
+  analyzePlaylist: (url) => ipcRenderer.invoke('analyze-playlist', url),
+  startDownload: (payload) => ipcRenderer.invoke('start-download', payload),
+  cancelDownload: (downloadId) => ipcRenderer.invoke('cancel-download', downloadId),
+  openFolder: (pasta) => ipcRenderer.invoke('open-folder', pasta),
+  selectOutputDir: () => ipcRenderer.invoke('select-output-dir'),
+  getHistory: () => ipcRenderer.invoke('get-history'),
+  clearHistory: () => ipcRenderer.invoke('clear-history'),
+  onProgress: (callback) => {
+    const handler = (_event, data) => callback(data)
+    ipcRenderer.on('download-progress', handler)
+    return () => ipcRenderer.removeListener('download-progress', handler)
   }
-} else {
-  window.electron = electronAPI
-  window.api = api
-}
+})
