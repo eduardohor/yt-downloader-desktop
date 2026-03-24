@@ -88,46 +88,40 @@ function onNovoDownload() {
           {{ erro }}
         </div>
 
-        <!-- Seletor de formato (visível quando há vídeo ou em idle) -->
-        <FormatSelector
-          v-model="formato"
-          :disabled="status === 'downloading'"
-        />
+        <template v-if="videoInfo">
+          <FormatSelector
+            v-model="formato"
+            :disabled="status === 'downloading'"
+          />
 
-        <!-- Progresso -->
-        <ProgressBar
-          :progress="progress"
-          :status="status"
-          @cancelar="cancelarDownload"
-        />
+          <ProgressBar
+            :progress="progress"
+            :status="status"
+            @cancelar="cancelarDownload"
+          />
 
-        <!-- Mensagem de sucesso -->
-        <div v-if="status === 'done'" class="sucesso">
-          <span>Download concluído!</span>
-          <div class="sucesso-acoes">
-            <button class="btn-sec" @click="() => window.api.openFolder(pastaDestino)">
-              Abrir pasta
-            </button>
-            <button class="btn-sec" @click="onNovoDownload">
-              Novo download
-            </button>
+          <div v-if="status === 'done'" class="sucesso">
+            <span>Download concluído!</span>
+            <div class="sucesso-acoes">
+              <button class="btn-sec" @click="() => window.api.openFolder(pastaDestino)">
+                Abrir pasta
+              </button>
+              <button class="btn-sec" @click="onNovoDownload">
+                Novo download
+              </button>
+            </div>
           </div>
-        </div>
 
-        <!-- Botões de ação -->
-        <div class="acoes" v-if="status !== 'done' && status !== 'downloading'">
-          <button
-            class="btn-download"
-            :disabled="!urlAtual || status === 'analyzing'"
-            @click="onDownload"
-          >
-            Baixar
-          </button>
-          <div class="pasta-row">
-            <span class="pasta-label">📁 {{ outputDir || 'Pasta padrão (Downloads/YTDownloader)' }}</span>
-            <button class="btn-link" @click="selecionarPasta">Alterar</button>
+          <div class="acoes" v-if="status !== 'done' && status !== 'downloading'">
+            <button class="btn-download" @click="onDownload">
+              Baixar
+            </button>
+            <div class="pasta-row">
+              <span class="pasta-label">📁 {{ outputDir || 'Pasta padrão (Downloads/YTDownloader)' }}</span>
+              <button class="btn-link" @click="selecionarPasta">Alterar</button>
+            </div>
           </div>
-        </div>
+        </template>
 
       </div>
 
