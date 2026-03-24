@@ -5,22 +5,38 @@ const props = defineProps({
   modelValue: String,
   disabled: Boolean,
   videoHeights: Array,
-  maxAudioBitrate: Number
+  maxAudioBitrate: Number,
+  sizesByHeight: Object,
+  audioSizeHigh: Number,
+  audioSizeMedium: Number
 })
+
+function formatarTamanho(bytes) {
+  if (!bytes || bytes === 0) return null
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(0)} MB`
+  return `${(bytes / 1024).toFixed(0)} KB`
+}
 
 const emit = defineEmits(['update:modelValue'])
 
 const formatosVideo = computed(() => {
   const alturas = props.videoHeights || []
-
+  const sizes = props.sizesByHeight || {}
   const opcoes = []
+
+  function subLabel(res, heightReal) {
+    const qualidade = res >= 2160 ? '4K' : res >= 1440 ? '2K' : res >= 1080 ? 'Full HD' : res >= 720 ? 'HD' : res >= 480 ? 'SD' : 'baixa resolução'
+    const tamanho = formatarTamanho(sizes[heightReal])
+    return tamanho ? `${qualidade} · ~${tamanho}` : qualidade
+  }
 
   if (alturas.length > 0) {
     const melhor = alturas[0]
     opcoes.push({
       value: 'mp4-best',
       label: `MP4 — ${melhor}p (melhor disponível)`,
-      sub: melhor >= 2160 ? '4K' : melhor >= 1440 ? '2K' : melhor >= 1080 ? 'Full HD' : melhor >= 720 ? 'HD' : 'SD',
+      sub: subLabel(melhor, melhor),
       icon: '🎬'
     })
   }
@@ -30,11 +46,11 @@ const formatosVideo = computed(() => {
     const disponivel = alturas.some((h) => h <= res)
     if (!disponivel) continue
     const real = alturas.find((h) => h <= res) || res
-    if (real === alturas[0]) continue // já está como "melhor disponível"
+    if (real === alturas[0]) continue
     opcoes.push({
       value: `mp4-${res}`,
       label: `MP4 — ${res}p`,
-      sub: res >= 1080 ? 'Full HD' : res >= 720 ? 'HD' : res >= 480 ? 'SD' : 'baixa resolução',
+      sub: subLabel(res, real),
       icon: '📹'
     })
   }
@@ -44,18 +60,19 @@ const formatosVideo = computed(() => {
 
 const formatosAudio = computed(() => {
   const maxBitrate = props.maxAudioBitrate || 128
+  const tamanhoHigh = formatarTamanho(props.audioSizeHigh)
+  const tamanhoMedium = formatarTamanho(props.audioSizeMedium)
 
-  const opcoes = []
+  const subHigh = maxBitrate >= 192
+    ? `até ${Math.min(maxBitrate, 320)} kbps${tamanhoHigh ? ` · ~${tamanhoHigh}` : ''}`
+    : `${maxBitrate} kbps (máximo disponível)${tamanhoHigh ? ` · ~${tamanhoHigh}` : ''}`
 
-  if (maxBitrate >= 192) {
-    opcoes.push({ value: 'mp3-high', label: 'MP3 — Alta qualidade', sub: `até ${Math.min(maxBitrate, 320)} kbps`, icon: '🎵' })
-  } else {
-    opcoes.push({ value: 'mp3-high', label: 'MP3 — Alta qualidade', sub: `${maxBitrate} kbps (máximo disponível)`, icon: '🎵' })
-  }
+  const subMedium = `128 kbps · arquivo menor${tamanhoMedium ? ` · ~${tamanhoMedium}` : ''}`
 
-  opcoes.push({ value: 'mp3-medium', label: 'MP3 — Qualidade padrão', sub: '128 kbps · arquivo menor', icon: '🎵' })
-
-  return opcoes
+  return [
+    { value: 'mp3-high', label: 'MP3 — Alta qualidade', sub: subHigh, icon: '🎵' },
+    { value: 'mp3-medium', label: 'MP3 — Qualidade padrão', sub: subMedium, icon: '🎵' }
+  ]
 })
 </script>
 

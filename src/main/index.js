@@ -1,9 +1,18 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
-import { spawn } from 'child_process'
+import { spawn, spawnSync } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import ffmpegStatic from 'ffmpeg-static'
+
+function detectarNodePath() {
+  const cmd = process.platform === 'win32' ? 'where' : 'which'
+  const result = spawnSync(cmd, ['node'], { encoding: 'utf-8' })
+  if (result.status === 0) return result.stdout.trim().split('\n')[0].trim()
+  return null
+}
+
+const nodePath = detectarNodePath()
 
 const isDev = is.dev
 const resourcesPath = isDev
@@ -74,7 +83,9 @@ function createWindow() {
 
 ipcMain.handle('analyze-url', async (_event, url) => {
   return new Promise((resolve, reject) => {
-    const args = ['--dump-json', '--no-playlist', url]
+    const args = ['--dump-json', '--no-playlist']
+    if (nodePath) args.push('--js-runtimes', `node:${nodePath}`)
+    args.push(url)
     const proc = spawn(ytdlpBin, args)
     let output = ''
     let errorOutput = ''
@@ -105,6 +116,31 @@ ipcMain.handle('analyze-url', async (_event, url) => {
           .map((f) => Math.round(f.abr))
         const maxAudioBitrate = audioBitrates.length > 0 ? Math.max(...audioBitrates) : 128
 
+        // Streams de áudio ordenados por bitrate
+        const audioFormats = formats
+          .filter((f) => f.abr && f.abr > 0)
+          .sort((a, b) => (b.abr || 0) - (a.abr || 0))
+
+        const melhorAudio = audioFormats[0]
+        const audioSize = melhorAudio ? (melhorAudio.filesize || melhorAudio.filesize_approx || 0) : 0
+
+        // Tamanho estimado para alta qualidade (stream de áudio bruto, antes da conversão para mp3)
+        const audioSizeHigh = audioSize
+
+        // Tamanho estimado para qualidade média: calcula com base em 128kbps × duração
+        const duracao = info.duration || 0
+        const audioSizeMedium = duracao > 0 ? Math.round((128000 / 8) * duracao) : 0
+
+        // Tamanho aproximado por resolução (video stream + audio stream)
+        const sizesByHeight = {}
+        videoHeights.forEach((h) => {
+          const melhorVideo = formats
+            .filter((f) => f.height === h)
+            .sort((a, b) => (b.filesize || b.filesize_approx || 0) - (a.filesize || a.filesize_approx || 0))[0]
+          const videoSize = melhorVideo ? (melhorVideo.filesize || melhorVideo.filesize_approx || 0) : 0
+          if (videoSize > 0) sizesByHeight[h] = videoSize + audioSize
+        })
+
         resolve({
           title: info.title,
           thumbnail: info.thumbnail,
@@ -112,7 +148,10 @@ ipcMain.handle('analyze-url', async (_event, url) => {
           uploader: info.uploader,
           isPlaylist: false,
           videoHeights,
-          maxAudioBitrate
+          maxAudioBitrate,
+          sizesByHeight,
+          audioSizeHigh,
+          audioSizeMedium
         })
       } catch {
         reject(new Error('Erro ao processar informações do vídeo'))
@@ -123,7 +162,9 @@ ipcMain.handle('analyze-url', async (_event, url) => {
 
 ipcMain.handle('analyze-playlist', async (_event, url) => {
   return new Promise((resolve, reject) => {
-    const args = ['--flat-playlist', '--dump-json', url]
+    const args = ['--flat-playlist', '--dump-json']
+    if (nodePath) args.push('--js-runtimes', `node:${nodePath}`)
+    args.push(url)
     const proc = spawn(ytdlpBin, args)
     let output = ''
     let errorOutput = ''
@@ -156,8 +197,12 @@ ipcMain.handle('start-download', async (_event, { url, format, outputDir, downlo
     const pasta = join(pastaBase, 'YTDownloader', isAudio ? 'audio' : 'videos')
     mkdirSync(pasta, { recursive: true })
 
-    const outputTemplate = join(pasta, '%(title)s.%(ext)s')
+    const labelFormato = isAudio
+      ? (format === 'mp3-high' ? 'high' : 'medium')
+      : format === 'mp4-best' ? 'best' : format.replace('mp4-', '') + 'p'
+    const outputTemplate = join(pasta, `%(title)s_${labelFormato}.%(ext)s`)
     let args = ['--ffmpeg-location', ffmpegBin, '-o', outputTemplate, '--newline']
+    if (nodePath) args.push('--js-runtimes', `node:${nodePath}`)
 
     if (format === 'mp4-best') {
       args.push('-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best')

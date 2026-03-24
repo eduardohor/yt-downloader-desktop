@@ -91,6 +91,8 @@ export function useDownload() {
     progress.value = 0
     erro.value = null
     arquivoDestino.value = null
+    videoInfo.value = null
+    pastaDestino.value = null
   }
 
   return {

@@ -38,6 +38,11 @@ async function onDownload() {
 function onNovoDownload() {
   resetar()
   urlAtual.value = ''
+  formato.value = 'mp4-best'
+}
+
+function abrirPasta() {
+  window.api.openFolder(pastaDestino.value)
 }
 </script>
 
@@ -75,6 +80,7 @@ function onNovoDownload() {
 
         <!-- URL Input -->
         <UrlInput
+          v-if="status !== 'done'"
           :status="status"
           :disabled="status === 'downloading' || status === 'analyzing'"
           @analisar="onAnalisar"
@@ -88,14 +94,19 @@ function onNovoDownload() {
           {{ erro }}
         </div>
 
-        <template v-if="videoInfo">
+        <template v-if="videoInfo && status !== 'done'">
           <FormatSelector
             v-model="formato"
             :disabled="status === 'downloading'"
             :videoHeights="videoInfo.videoHeights"
             :maxAudioBitrate="videoInfo.maxAudioBitrate"
+            :sizesByHeight="videoInfo.sizesByHeight"
+            :audioSizeHigh="videoInfo.audioSizeHigh"
+            :audioSizeMedium="videoInfo.audioSizeMedium"
           />
+        </template>
 
+        <template v-if="videoInfo">
           <ProgressBar
             :progress="progress"
             :status="status"
@@ -105,7 +116,7 @@ function onNovoDownload() {
           <div v-if="status === 'done'" class="sucesso">
             <span>Download concluído!</span>
             <div class="sucesso-acoes">
-              <button class="btn-sec" @click="() => window.api.openFolder(pastaDestino)">
+              <button class="btn-sec" @click="abrirPasta">
                 Abrir pasta
               </button>
               <button class="btn-sec" @click="onNovoDownload">
